@@ -106,7 +106,7 @@ func brotliCompress(path string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *Client) UploadFileBrotliCompressed(remotePath string, path string) (info minio.UploadInfo, err error) {
+func (c *Client) UploadFileBrotliCompressedPublic(remotePath string, path string) (info minio.UploadInfo, err error) {
 	// TODO: use io.Pipe() to do compression more efficiently
 	d, err := brotliCompress(path)
 	if err != nil {
