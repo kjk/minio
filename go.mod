@@ -5,6 +5,7 @@ go 1.17
 require github.com/minio/minio-go/v7 v7.0.14
 
 require (
+	github.com/andybalholm/brotli v1.0.3 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect

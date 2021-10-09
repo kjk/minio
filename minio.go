@@ -1,12 +1,17 @@
 package minio
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/andybalholm/brotli"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -70,12 +75,53 @@ func (c *Client) Exists(remotePath string) bool {
 }
 
 func (c *Client) UploadFilePublic(remotePath string, path string) error {
-	contentType := mime.TypeByExtension(remotePath)
+	ext := filepath.Ext(remotePath)
+	contentType := mime.TypeByExtension(ext)
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
 	setPublicObjectMetadata(&opts)
 	_, err := c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
+	return err
+}
+
+func brotliCompress(path string) ([]byte, error) {
+	var buf bytes.Buffer
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	w := brotli.NewWriterLevel(&buf, brotli.BestCompression)
+	_, err = io.Copy(w, f)
+	if err != nil {
+		return nil, err
+	}
+	err = w.Close()
+	if err != nil {
+		return nil, err
+	}
+	err = f.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c *Client) UploadFileBrotliCompressed(remotePath string, path string) error {
+	// TODO: use io.Pipe() to do compression more efficiently
+	d, err := brotliCompress(path)
+	if err != nil {
+		return err
+	}
+	ext := filepath.Ext(remotePath)
+	contentType := mime.TypeByExtension(ext)
+	opts := minio.PutObjectOptions{
+		ContentType: contentType,
+	}
+	setPublicObjectMetadata(&opts)
+	r := bytes.NewReader(d)
+	fsize := int64(len(d))
+	_, err = c.c.PutObject(ctx(), c.bucket, remotePath, r, fsize, opts)
 	return err
 }
 
