@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -68,6 +69,23 @@ func (c *Client) Exists(remotePath string) bool {
 	return err == nil
 }
 
+func (c *Client) UploadFilePublic(remotePath string, path string) error {
+	contentType := mime.TypeByExtension(remotePath)
+	opts := minio.PutObjectOptions{
+		ContentType: contentType,
+	}
+	setPublicObjectMetadata(&opts)
+	_, err := c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
+	return err
+}
+
 func ctx() context.Context {
 	return context.Background()
+}
+
+func setPublicObjectMetadata(opts *minio.PutObjectOptions) {
+	if opts.UserMetadata == nil {
+		opts.UserMetadata = map[string]string{}
+	}
+	opts.UserMetadata["x-amz-acl"] = "public-read"
 }
