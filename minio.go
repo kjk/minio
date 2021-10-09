@@ -74,15 +74,14 @@ func (c *Client) Exists(remotePath string) bool {
 	return err == nil
 }
 
-func (c *Client) UploadFilePublic(remotePath string, path string) error {
+func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.UploadInfo, err error) {
 	ext := filepath.Ext(remotePath)
 	contentType := mime.TypeByExtension(ext)
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
 	setPublicObjectMetadata(&opts)
-	_, err := c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
-	return err
+	return c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
 }
 
 func brotliCompress(path string) ([]byte, error) {
@@ -107,11 +106,11 @@ func brotliCompress(path string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *Client) UploadFileBrotliCompressed(remotePath string, path string) error {
+func (c *Client) UploadFileBrotliCompressed(remotePath string, path string) (info minio.UploadInfo, err error) {
 	// TODO: use io.Pipe() to do compression more efficiently
 	d, err := brotliCompress(path)
 	if err != nil {
-		return err
+		return
 	}
 	ext := filepath.Ext(remotePath)
 	contentType := mime.TypeByExtension(ext)
@@ -121,8 +120,7 @@ func (c *Client) UploadFileBrotliCompressed(remotePath string, path string) erro
 	setPublicObjectMetadata(&opts)
 	r := bytes.NewReader(d)
 	fsize := int64(len(d))
-	_, err = c.c.PutObject(ctx(), c.bucket, remotePath, r, fsize, opts)
-	return err
+	return c.c.PutObject(ctx(), c.bucket, remotePath, r, fsize, opts)
 }
 
 func ctx() context.Context {
