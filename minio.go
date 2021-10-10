@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/andybalholm/brotli"
+	"github.com/kjk/common/atomicfile"
 	"github.com/kjk/common/u"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -77,6 +78,33 @@ func (c *Client) Exists(remotePath string) bool {
 	return err == nil
 }
 
+func (c *Client) DownloadFileAtomically(dstPath string, remotePath string) error {
+	opts := minio.GetObjectOptions{}
+	obj, err := c.c.GetObject(ctx(), c.bucket, remotePath, opts)
+	if err != nil {
+		return err
+	}
+	defer obj.Close()
+
+	// ensure there's a dir for destination file
+	dir := filepath.Dir(dstPath)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	f, err := atomicfile.New(dstPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, obj)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
 func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.UploadInfo, err error) {
 	ext := filepath.Ext(remotePath)
 	contentType := mime.TypeByExtension(ext)
@@ -98,7 +126,7 @@ func (c *Client) UploadDataPublic(remotePath string, data []byte) error {
 	return err
 }
 
-func (mc *Client) UploadDir(dirRemote string, dirLocal string) error {
+func (c *Client) UploadDir(dirRemote string, dirLocal string) error {
 	files, err := ioutil.ReadDir(dirLocal)
 	if err != nil {
 		return err
@@ -107,12 +135,26 @@ func (mc *Client) UploadDir(dirRemote string, dirLocal string) error {
 		fname := f.Name()
 		pathLocal := filepath.Join(dirLocal, fname)
 		pathRemote := path.Join(dirRemote, fname)
-		_, err := mc.UploadFilePublic(pathRemote, pathLocal)
+		_, err := c.UploadFilePublic(pathRemote, pathLocal)
 		if err != nil {
 			return fmt.Errorf("upload of '%s' as '%s' failed with '%s'", pathLocal, pathRemote, err)
 		}
 	}
 	return nil
+}
+
+func (c *Client) ListObjects(mc *minio.Client, prefix string) <-chan minio.ObjectInfo {
+	opts := minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	}
+	return c.c.ListObjects(ctx(), c.bucket, opts)
+}
+
+func (c *Client) Remove(remotePath string) error {
+	opts := minio.RemoveObjectOptions{}
+	err := c.c.RemoveObject(ctx(), c.bucket, remotePath, opts)
+	return err
 }
 
 func brotliCompress(path string) ([]byte, error) {
