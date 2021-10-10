@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"mime"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/andybalholm/brotli"
+	"github.com/kjk/common/u"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -82,6 +85,34 @@ func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.Up
 	}
 	setPublicObjectMetadata(&opts)
 	return c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
+}
+
+func (c *Client) UploadDataPublic(remotePath string, data []byte) error {
+	contentType := u.MimeTypeFromFileName(remotePath)
+	opts := minio.PutObjectOptions{
+		ContentType: contentType,
+	}
+	setPublicObjectMetadata(&opts)
+	r := bytes.NewBuffer(data)
+	_, err := c.c.PutObject(ctx(), c.bucket, remotePath, r, int64(len(data)), opts)
+	return err
+}
+
+func (mc *Client) UploadDir(dirRemote string, dirLocal string) error {
+	files, err := ioutil.ReadDir(dirLocal)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		fname := f.Name()
+		pathLocal := filepath.Join(dirLocal, fname)
+		pathRemote := path.Join(dirRemote, fname)
+		_, err := mc.UploadFilePublic(pathRemote, pathLocal)
+		if err != nil {
+			return fmt.Errorf("upload of '%s' as '%s' failed with '%s'", pathLocal, pathRemote, err)
+		}
+	}
+	return nil
 }
 
 func brotliCompress(path string) ([]byte, error) {
