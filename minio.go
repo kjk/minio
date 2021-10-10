@@ -143,7 +143,7 @@ func (c *Client) UploadDir(dirRemote string, dirLocal string) error {
 	return nil
 }
 
-func (c *Client) ListObjects(mc *minio.Client, prefix string) <-chan minio.ObjectInfo {
+func (c *Client) ListObjects(prefix string) <-chan minio.ObjectInfo {
 	opts := minio.ListObjectsOptions{
 		Prefix:    prefix,
 		Recursive: true,
