@@ -105,7 +105,7 @@ func (c *Client) DownloadFileAtomically(dstPath string, remotePath string) error
 	return f.Close()
 }
 
-func (c *Client) uploadFile(remotePath string, path string, public bool) (info minio.UploadInfo, err error) {
+func (c *Client) UploadFile(remotePath string, path string, public bool) (info minio.UploadInfo, err error) {
 	ext := filepath.Ext(remotePath)
 	contentType := mime.TypeByExtension(ext)
 	opts := minio.PutObjectOptions{
@@ -117,15 +117,7 @@ func (c *Client) uploadFile(remotePath string, path string, public bool) (info m
 	return c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
 }
 
-func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.UploadInfo, err error) {
-	return c.uploadFile(remotePath, path, true)
-}
-
-func (c *Client) UploadFilePrivate(remotePath string, path string) (info minio.UploadInfo, err error) {
-	return c.uploadFile(remotePath, path, false)
-}
-
-func (c *Client) uploadData(remotePath string, data []byte, public bool) error {
+func (c *Client) UploadData(remotePath string, data []byte, public bool) (info minio.UploadInfo, err error) {
 	contentType := u.MimeTypeFromFileName(remotePath)
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
@@ -134,19 +126,10 @@ func (c *Client) uploadData(remotePath string, data []byte, public bool) error {
 		setPublicObjectMetadata(&opts)
 	}
 	r := bytes.NewBuffer(data)
-	_, err := c.c.PutObject(ctx(), c.bucket, remotePath, r, int64(len(data)), opts)
-	return err
+	return c.c.PutObject(ctx(), c.bucket, remotePath, r, int64(len(data)), opts)
 }
 
-func (c *Client) UploadDataPublic(remotePath string, data []byte) error {
-	return c.uploadData(remotePath, data, true)
-}
-
-func (c *Client) UploadDataPrivate(remotePath string, data []byte) error {
-	return c.uploadData(remotePath, data, false)
-}
-
-func (c *Client) UploadDir(dirRemote string, dirLocal string) error {
+func (c *Client) UploadDir(dirRemote string, dirLocal string, public bool) error {
 	files, err := ioutil.ReadDir(dirLocal)
 	if err != nil {
 		return err
@@ -155,7 +138,7 @@ func (c *Client) UploadDir(dirRemote string, dirLocal string) error {
 		fname := f.Name()
 		pathLocal := filepath.Join(dirLocal, fname)
 		pathRemote := path.Join(dirRemote, fname)
-		_, err := c.UploadFilePublic(pathRemote, pathLocal)
+		_, err := c.UploadFile(pathRemote, pathLocal, public)
 		if err != nil {
 			return fmt.Errorf("upload of '%s' as '%s' failed with '%s'", pathLocal, pathRemote, err)
 		}
@@ -199,7 +182,7 @@ func brotliCompress(path string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *Client) UploadFileBrotliCompressedPublic(remotePath string, path string) (info minio.UploadInfo, err error) {
+func (c *Client) UploadFileBrotliCompressed(remotePath string, path string, public bool) (info minio.UploadInfo, err error) {
 	// TODO: use io.Pipe() to do compression more efficiently
 	d, err := brotliCompress(path)
 	if err != nil {
@@ -210,7 +193,9 @@ func (c *Client) UploadFileBrotliCompressedPublic(remotePath string, path string
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
-	setPublicObjectMetadata(&opts)
+	if public {
+		setPublicObjectMetadata(&opts)
+	}
 	r := bytes.NewReader(d)
 	fsize := int64(len(d))
 	return c.c.PutObject(ctx(), c.bucket, remotePath, r, fsize, opts)
