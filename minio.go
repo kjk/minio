@@ -105,25 +105,45 @@ func (c *Client) DownloadFileAtomically(dstPath string, remotePath string) error
 	return f.Close()
 }
 
-func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.UploadInfo, err error) {
+func (c *Client) uploadFile(remotePath string, path string, public bool) (info minio.UploadInfo, err error) {
 	ext := filepath.Ext(remotePath)
 	contentType := mime.TypeByExtension(ext)
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
-	setPublicObjectMetadata(&opts)
+	if public {
+		setPublicObjectMetadata(&opts)
+	}
 	return c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
 }
 
-func (c *Client) UploadDataPublic(remotePath string, data []byte) error {
+func (c *Client) UploadFilePublic(remotePath string, path string) (info minio.UploadInfo, err error) {
+	return c.uploadFile(remotePath, path, true)
+}
+
+func (c *Client) UploadFilePrivate(remotePath string, path string) (info minio.UploadInfo, err error) {
+	return c.uploadFile(remotePath, path, false)
+}
+
+func (c *Client) uploadData(remotePath string, data []byte, public bool) error {
 	contentType := u.MimeTypeFromFileName(remotePath)
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
-	setPublicObjectMetadata(&opts)
+	if public {
+		setPublicObjectMetadata(&opts)
+	}
 	r := bytes.NewBuffer(data)
 	_, err := c.c.PutObject(ctx(), c.bucket, remotePath, r, int64(len(data)), opts)
 	return err
+}
+
+func (c *Client) UploadDataPublic(remotePath string, data []byte) error {
+	return c.uploadData(remotePath, data, true)
+}
+
+func (c *Client) UploadDataPrivate(remotePath string, data []byte) error {
+	return c.uploadData(remotePath, data, false)
 }
 
 func (c *Client) UploadDir(dirRemote string, dirLocal string) error {
