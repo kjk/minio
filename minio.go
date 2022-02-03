@@ -28,9 +28,9 @@ type Config struct {
 }
 
 type Client struct {
-	c      *minio.Client
+	Client *minio.Client
 	config *Config
-	bucket string
+	Bucket string
 }
 
 func New(config *Config) (*Client, error) {
@@ -58,15 +58,15 @@ func New(config *Config) (*Client, error) {
 	}
 
 	return &Client{
-		c:      mc,
+		Client: mc,
 		config: config,
-		bucket: config.Bucket,
+		Bucket: config.Bucket,
 	}, nil
 }
 
 func (c *Client) URLBase() string {
-	url := c.c.EndpointURL()
-	return fmt.Sprintf("https://%s.%s/", c.bucket, url.Host)
+	url := c.Client.EndpointURL()
+	return fmt.Sprintf("https://%s.%s/", c.Bucket, url.Host)
 }
 
 func (c *Client) URLForPath(remotePath string) string {
@@ -74,13 +74,38 @@ func (c *Client) URLForPath(remotePath string) string {
 }
 
 func (c *Client) Exists(remotePath string) bool {
-	_, err := c.c.StatObject(ctx(), c.bucket, remotePath, minio.StatObjectOptions{})
+	_, err := c.Client.StatObject(ctx(), c.Bucket, remotePath, minio.StatObjectOptions{})
 	return err == nil
+}
+
+func (c *Client) Rename(oldPath, newPath string) (*minio.UploadInfo, error) {
+	_, err := c.Client.StatObject(ctx(), c.Bucket, newPath, minio.StatObjectOptions{})
+	if err == nil {
+		return nil, errors.New("destination already exists")
+	}
+	dstOpts := minio.CopyDestOptions{
+		Bucket: c.Bucket,
+		Object: newPath,
+	}
+	srcOpts := minio.CopySrcOptions{
+		Bucket: c.Bucket,
+		Object: oldPath,
+	}
+	ui, err := c.Client.CopyObject(ctx(), dstOpts, srcOpts)
+	if err != nil {
+		return nil, err
+	}
+	err = c.Client.RemoveObject(ctx(), c.Bucket, oldPath, minio.RemoveObjectOptions{})
+	if err != nil {
+		_ = c.Client.RemoveObject(ctx(), c.Bucket, newPath, minio.RemoveObjectOptions{})
+		return nil, err
+	}
+	return &ui, nil
 }
 
 func (c *Client) DownloadFileAtomically(dstPath string, remotePath string) error {
 	opts := minio.GetObjectOptions{}
-	obj, err := c.c.GetObject(ctx(), c.bucket, remotePath, opts)
+	obj, err := c.Client.GetObject(ctx(), c.Bucket, remotePath, opts)
 	if err != nil {
 		return err
 	}
@@ -114,7 +139,7 @@ func (c *Client) UploadFile(remotePath string, path string, public bool) (info m
 	if public {
 		setPublicObjectMetadata(&opts)
 	}
-	return c.c.FPutObject(ctx(), c.bucket, remotePath, path, opts)
+	return c.Client.FPutObject(ctx(), c.Bucket, remotePath, path, opts)
 }
 
 func (c *Client) UploadData(remotePath string, data []byte, public bool) (info minio.UploadInfo, err error) {
@@ -126,7 +151,7 @@ func (c *Client) UploadData(remotePath string, data []byte, public bool) (info m
 		setPublicObjectMetadata(&opts)
 	}
 	r := bytes.NewBuffer(data)
-	return c.c.PutObject(ctx(), c.bucket, remotePath, r, int64(len(data)), opts)
+	return c.Client.PutObject(ctx(), c.Bucket, remotePath, r, int64(len(data)), opts)
 }
 
 func (c *Client) UploadDir(dirRemote string, dirLocal string, public bool) error {
@@ -151,12 +176,12 @@ func (c *Client) ListObjects(prefix string) <-chan minio.ObjectInfo {
 		Prefix:    prefix,
 		Recursive: true,
 	}
-	return c.c.ListObjects(ctx(), c.bucket, opts)
+	return c.Client.ListObjects(ctx(), c.Bucket, opts)
 }
 
 func (c *Client) Remove(remotePath string) error {
 	opts := minio.RemoveObjectOptions{}
-	err := c.c.RemoveObject(ctx(), c.bucket, remotePath, opts)
+	err := c.Client.RemoveObject(ctx(), c.Bucket, remotePath, opts)
 	return err
 }
 
@@ -198,7 +223,7 @@ func (c *Client) UploadFileBrotliCompressed(remotePath string, path string, publ
 	}
 	r := bytes.NewReader(d)
 	fsize := int64(len(d))
-	return c.c.PutObject(ctx(), c.bucket, remotePath, r, fsize, opts)
+	return c.Client.PutObject(ctx(), c.Bucket, remotePath, r, fsize, opts)
 }
 
 func ctx() context.Context {
