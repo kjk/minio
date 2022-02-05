@@ -78,6 +78,23 @@ func (c *Client) Exists(remotePath string) bool {
 	return err == nil
 }
 
+func (c *Client) Copy(oldPath, newPath string) (*minio.UploadInfo, error) {
+	_, err := c.Client.StatObject(ctx(), c.Bucket, newPath, minio.StatObjectOptions{})
+	if err == nil {
+		return nil, os.ErrExist
+	}
+	dstOpts := minio.CopyDestOptions{
+		Bucket: c.Bucket,
+		Object: newPath,
+	}
+	srcOpts := minio.CopySrcOptions{
+		Bucket: c.Bucket,
+		Object: oldPath,
+	}
+	ui, err := c.Client.CopyObject(ctx(), dstOpts, srcOpts)
+	return &ui, err
+}
+
 func (c *Client) Rename(oldPath, newPath string) (*minio.UploadInfo, error) {
 	_, err := c.Client.StatObject(ctx(), c.Bucket, newPath, minio.StatObjectOptions{})
 	if err == nil {
