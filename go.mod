@@ -1,4 +1,4 @@
-module github.com/kjk/minio
+module github.com/kjk/minioutil
 
 go 1.17
 
