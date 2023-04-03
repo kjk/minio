@@ -25,6 +25,7 @@ type Config struct {
 	Secret   string
 	Bucket   string
 	Endpoint string
+	Region   string
 }
 
 type Client struct {
@@ -44,7 +45,7 @@ func New(config *Config) (*Client, error) {
 
 	mc, err := minio.New(c.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(c.Access, c.Secret, ""),
-		Secure: true,
+		Region: config.Region,
 	})
 	if err != nil {
 		return nil, err
