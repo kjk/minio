@@ -21,11 +21,12 @@ import (
 )
 
 type Config struct {
-	Access   string
-	Secret   string
-	Bucket   string
-	Endpoint string
-	Region   string
+	Access       string
+	Secret       string
+	Bucket       string
+	Endpoint     string
+	Region       string
+	RequestTrace io.Writer
 }
 
 type Client struct {
@@ -46,9 +47,13 @@ func New(config *Config) (*Client, error) {
 	mc, err := minio.New(c.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(c.Access, c.Secret, ""),
 		Region: config.Region,
+		Secure: true,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if config.RequestTrace != nil {
+		mc.TraceOn(config.RequestTrace)
 	}
 	found, err := mc.BucketExists(ctx(), c.Bucket)
 	if err != nil {

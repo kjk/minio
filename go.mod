@@ -3,8 +3,8 @@ module github.com/kjk/minioutil
 go 1.17
 
 require (
-	github.com/andybalholm/brotli v1.0.4
-	github.com/kjk/common v0.0.0-20220705191345-4e210bd3860d
+	github.com/andybalholm/brotli v1.0.5
+	github.com/kjk/common v0.0.0-20230130064555-6b11a946b7d1
 	github.com/minio/minio-go/v7 v7.0.50
 )
 
